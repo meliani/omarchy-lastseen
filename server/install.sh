@@ -20,7 +20,15 @@ need python3 "your package manager"
 docker compose version >/dev/null 2>&1 || die "the Docker Compose plugin is required"
 
 random() { python3 -c 'import secrets; print(secrets.token_hex(24))'; }
-json() { python3 -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+# Read one field of a JSON reply by its path ("0.token", "instance.state"): plain data access.
+json() {
+  python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for part in sys.argv[1].split("."):
+    d = d[int(part)] if isinstance(d, list) else (d or {}).get(part, "")
+print(d if d is not None else "")' "$1" 2>/dev/null || true
+}
 
 # ---- secrets: generated once, kept in .env
 [[ -f .env ]] || cp .env.example .env
@@ -63,17 +71,17 @@ else
   call -X POST "$API/instance/create" \
     -d "{\"instanceName\": \"$INSTANCE\", \"integration\": \"WHATSAPP-BAILEYS\", \"qrcode\": true}" >/dev/null
 fi
-token=$(call "$API/instance/fetchInstances?instanceName=$enc" | json 'd[0]["token"]')
-state=$(call "$API/instance/connectionState/$enc" | json 'd.get("instance", d).get("state", "")')
+token=$(call "$API/instance/fetchInstances?instanceName=$enc" | json 0.token)
+state=$(call "$API/instance/connectionState/$enc" | json instance.state)
 
 if [[ "$state" != "open" ]]; then
   say "Link your phone: WhatsApp > Settings > Linked devices > Link a device"
   qr=$(call "$API/instance/connect/$enc")
-  code=$(printf '%s' "$qr" | json 'd.get("code", "")')
+  code=$(printf '%s' "$qr" | json code)
   if command -v qrencode >/dev/null && [[ -n "$code" ]]; then
     qrencode -t ansiutf8 "$code"
   else
-    printf '%s' "$qr" | json 'd.get("base64", "")' | sed 's/^data:image\/png;base64,//' | base64 -d >qr.png 2>/dev/null \
+    printf '%s' "$qr" | json base64 | sed 's/^data:image\/png;base64,//' | base64 -d >qr.png 2>/dev/null \
       && echo "QR code saved to $(pwd)/qr.png (install qrencode to see it here)"
   fi
   echo "The code changes every ~40 s: run ./install.sh \"$INSTANCE\" again for a fresh one,"

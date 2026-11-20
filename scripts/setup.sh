@@ -52,8 +52,9 @@ while :; do
   token=$(ask "API token of \"$name\" (the instance token)" "" --password)
   [[ -n "$token" ]] || die "a token is required"
   enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$name")
-  state=$(curl -fsS -H "apikey: $token" -H "User-Agent: curl/8.0" "$url/instance/connectionState/$enc" 2>/dev/null \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("instance", d).get("state", ""))' 2>/dev/null || true)
+  # The reply is parsed as JSON data (never run): fields are read by name.
+  reply=$(curl -fsS -H "apikey: $token" -H "User-Agent: curl/8.0" "$url/instance/connectionState/$enc" 2>/dev/null || true)
+  state=$(REPLY_JSON="$reply" python3 -c 'import json,os; d=json.loads(os.environ["REPLY_JSON"] or "{}"); print(d.get("instance", d).get("state", ""))' 2>/dev/null || true)
   [[ -n "$state" ]] || die "could not reach \"$name\" at $url with that token"
   store "$(slug "$name")-token" "$token"
   accounts+=("$name")
@@ -77,9 +78,8 @@ for pair in notify-send:libnotify wl-copy:wl-clipboard mpv:mpv ffmpeg:ffmpeg; do
 done
 python3 -c 'import pika' 2>/dev/null || missing+=(python-pika)
 if (( ${#missing[@]} )); then
-  say "Installing ${missing[*]}"
-  if command -v omarchy >/dev/null; then omarchy pkg add "${missing[@]}" || true
-  else sudo pacman -S --needed "${missing[@]}" || true; fi
+  say "Installing ${missing[*]} (Omarchy's package helper asks before changing anything)"
+  omarchy pkg add "${missing[@]}" || echo "Install them later with: omarchy pkg add ${missing[*]}"
 fi
 
 # ---- turn it on
