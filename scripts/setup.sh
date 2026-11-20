@@ -23,6 +23,7 @@ if [[ "${1:-}" == "--remove" ]]; then
 fi
 
 command -v secret-tool >/dev/null || die "secret-tool is missing (package libsecret)"
+command -v jq >/dev/null || die "jq is missing (omarchy pkg add jq)"
 
 ask() {   # ask "Question" [default] [--password]
   local value
@@ -51,10 +52,10 @@ while :; do
   [[ -z "$name" ]] && break
   token=$(ask "API token of \"$name\" (the instance token)" "" --password)
   [[ -n "$token" ]] || die "a token is required"
-  enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$name")
-  # The reply is parsed as JSON data (never run): fields are read by name.
+  enc=$(jq -rn --arg v "$name" '$v | @uri')
+  # The reply is JSON data; jq reads one field from it.
   reply=$(curl -fsS -H "apikey: $token" -H "User-Agent: curl/8.0" "$url/instance/connectionState/$enc" 2>/dev/null || true)
-  state=$(REPLY_JSON="$reply" python3 -c 'import json,os; d=json.loads(os.environ["REPLY_JSON"] or "{}"); print(d.get("instance", d).get("state", ""))' 2>/dev/null || true)
+  state=$(jq -r '(.instance // .).state // empty' <<<"$reply" 2>/dev/null || true)
   [[ -n "$state" ]] || die "could not reach \"$name\" at $url with that token"
   store "$(slug "$name")-token" "$token"
   accounts+=("$name")
@@ -76,7 +77,7 @@ missing=()
 for pair in notify-send:libnotify wl-copy:wl-clipboard mpv:mpv ffmpeg:ffmpeg; do
   command -v "${pair%%:*}" >/dev/null || missing+=("${pair#*:}")
 done
-python3 -c 'import pika' 2>/dev/null || missing+=(python-pika)
+pacman -Qq python-pika >/dev/null 2>&1 || missing+=(python-pika)
 if (( ${#missing[@]} )); then
   say "Installing ${missing[*]} (Omarchy's package helper asks before changing anything)"
   omarchy pkg add "${missing[@]}" || echo "Install them later with: omarchy pkg add ${missing[*]}"
