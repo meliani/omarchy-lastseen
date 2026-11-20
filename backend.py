@@ -435,6 +435,7 @@ class Directory:
         self.pics = {}       # picture file id -> phone jid
         self.looked = {}     # lid jid -> epoch of the last picture lookup
         self.links = {}      # lid jid -> phone jid the user said is the same person
+        self.read = {}       # chat jid -> id of its newest message when we marked it read
         self.me = ""
         self.my_jids = set()
         self.dirty = False
@@ -447,7 +448,7 @@ class Directory:
                 data = json.load(f)
         except (OSError, ValueError):
             return
-        for field in ("names", "push", "lid2pn", "subjects", "local", "links"):
+        for field in ("names", "push", "lid2pn", "subjects", "local", "links", "read"):
             if isinstance(data.get(field), dict):
                 setattr(self, field, {str(k): str(v) for k, v in data[field].items()})
         # Names saved before the letter rule ("." , "+212…") are dropped.
@@ -463,7 +464,7 @@ class Directory:
             if not self.dirty or not self.path:
                 return
             payload = {"names": self.names, "push": self.push, "lid2pn": self.lid2pn,
-                       "subjects": self.subjects, "local": self.local, "looked": self.looked, "links": self.links, "me": self.me,
+                       "subjects": self.subjects, "local": self.local, "looked": self.looked, "links": self.links, "read": self.read, "me": self.me,
                        "myJids": sorted(self.my_jids)}
             self.dirty = False
         os.makedirs(STATE_DIR, exist_ok=True)
@@ -513,6 +514,13 @@ class Directory:
             if name:
                 self._set(self.local, jid, name)
             elif self.local.pop(jid, None) is not None:
+                self.dirty = True
+
+    def mark_read(self, jid, msg_id):
+        with self.lock:
+            if msg_id:
+                self._set(self.read, jid, msg_id)
+            elif self.read.pop(jid, None) is not None:
                 self.dirty = True
 
     def phone_jid(self, jid):
@@ -792,7 +800,9 @@ class Backend:
                 "phone": d.phone(jid),
                 "group": is_group,
                 "avatar": self.avatar_path(jid),
-                "unread": 0 if self.is_open(jid, open_jid) else int(row.get("unreadCount") or 0),
+                # Evolution never lowers its count when we read: trust our own mark until a newer message.
+                "unread": 0 if self.is_open(jid, open_jid) or d.read.get(jid) == key.get("id")
+                          else int(row.get("unreadCount") or 0),
                 "ts": int(last.get("messageTimestamp") or 0) or self.iso_ts(row.get("updatedAt")),
                 "preview": dict(preview(parsed), deleted=is_deleted(last)),
                 "fromMe": bool(key.get("fromMe")),
@@ -952,7 +962,10 @@ class Backend:
                                 and time.time() - item["ts"] < EDIT_WINDOW)
             messages.append(item)
             if not from_me and msg_id not in {k["id"] for k in unread_keys}:
-                unread_keys.append({"id": msg_id, "remoteJid": key.get("remoteJid"), "fromMe": False})
+                remote = str(key.get("remoteJid") or "")
+                if remote.endswith("@lid"):     # Evolution 2.3.7 silently drops @lid keys when marking read
+                    remote = key.get("remoteJidAlt") or d.phone_jid(remote) or remote
+                unread_keys.append({"id": msg_id, "remoteJid": remote, "fromMe": False})
         messages.sort(key=lambda m: m["ts"], reverse=True)
         with self.lock:
             if jid != self.open_jid:
@@ -964,6 +977,14 @@ class Backend:
                 self.api.call("POST", "chat/markMessageAsRead", {"readMessages": unread_keys[:30]})
             except ApiError as e:
                 log(e)
+            newest = {}
+            for rec in records:
+                k = rec.get("key") or {}
+                if k.get("id") and int(rec.get("messageTimestamp") or 0) >= newest.get(k.get("remoteJid"), (0, ""))[0]:
+                    newest[k.get("remoteJid")] = (int(rec.get("messageTimestamp") or 0), str(k["id"]))
+            for alias, (_, mid) in newest.items():
+                d.mark_read(alias, mid)
+            d.save()
             with self.lock:
                 self.dirty_chats = True
 
@@ -1098,6 +1119,7 @@ class Backend:
 
     def mark_unread(self, jid):
         for alias in self.aliases.get(jid, [jid]):
+            self.directory.mark_read(alias, "")
             key = self.last_keys.get(alias)
             if key:
                 self.api.call("POST", "chat/markChatUnread", {"lastMessage": {"key": key}, "chat": alias})
@@ -1795,6 +1817,10 @@ def self_test():
     ]
     assert collect_reactions(rows) == {"M": [{"emoji": "😂", "count": 2, "mine": True}]}
     d = Directory()
+    d.mark_read("10000000000001@lid", "AB1")
+    assert d.read == {"10000000000001@lid": "AB1"} and d.dirty
+    d.mark_read("10000000000001@lid", "")
+    assert d.read == {}
     d.me = "Sam"
     d.names["212600000001@s.whatsapp.net"] = "Alex"
     d.map_lid("10000000000001@lid", "212600000001@s.whatsapp.net")
