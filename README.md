@@ -5,19 +5,22 @@
 <h1 align="center">Last Seen</h1>
 
 <p align="center">
-  <b>Your WhatsApp chats in the Omarchy bar. Fast, light, self-hosted.</b><br>
-  Read, reply, react, send voice notes and files, without a browser tab or an Electron app.
+  <b>All your WhatsApp accounts in the Omarchy bar. Very lightweight, self-hosted.</b><br>
+  Personal and work numbers side by side, one click apart: read, reply, react, send voice notes and files,<br>
+  with no browser tab and no Electron app — about 35 MB per account.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2fd59b"></a>
   <img alt="Omarchy plugin" src="https://img.shields.io/badge/Omarchy-bar%20plugin-2fd59b">
+  <img alt="Multi-account" src="https://img.shields.io/badge/accounts-unlimited-2fd59b">
+  <img alt="Memory per account" src="https://img.shields.io/badge/RAM-~35%20MB%20per%20account-2fd59b">
   <a href="https://github.com/EvolutionAPI/evolution-api"><img alt="Evolution API 2.3" src="https://img.shields.io/badge/Evolution%20API-2.3.x-2fd59b"></a>
   <a href="https://github.com/meliani/omarchy-lastseen/actions"><img alt="Tests" src="https://github.com/meliani/omarchy-lastseen/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
-  <img src="preview.png" width="880" alt="Last Seen: the chat list and a conversation, opened from the Omarchy bar (demo data)">
+  <img src="preview.png" width="920" alt="Last Seen with two WhatsApp accounts: the personal account's chats, the work account one click away (unread counts on each), and a conversation (demo data)">
 </p>
 
 > Last Seen is an independent project. It is not affiliated with, endorsed by or sponsored by WhatsApp or Meta.
@@ -25,25 +28,54 @@
 
 ---
 
-## Why
+## Every account, one bar
 
-WhatsApp on a Linux desktop usually means a browser tab or an Electron wrapper: hundreds of megabytes of RAM and a full web app running all day, just to see who wrote.
+Personal phone, work phone, the shop's number, the support line: connect as many WhatsApp accounts as you like and switch between them with one click.
 
-Last Seen runs WhatsApp **on your server**, not on your laptop:
+- **One switcher** at the top of the panel, each account with its picture and its own unread count
+- **One badge** in the bar: the total across all accounts
+- **Every account stays live**: messages, unread counts and notifications keep coming for the accounts you are not looking at
+- **Notifications say which account** ("Alex · Work"); "Open" switches to the right account and chat
+- **Nothing mixes**: contacts, names and drafts are kept per account
+
+Adding one is a line on the server and a line on the desktop:
+
+```bash
+./install.sh "Work phone"                                          # on the server: create it, scan its QR code
+~/.config/omarchy/plugins/meliani.lastseen/scripts/setup.sh        # on the desktop: add it (accounts already set up are kept)
+```
+
+## Very lightweight
+
+WhatsApp on a Linux desktop usually means a browser tab or an Electron wrapper: a full web app running all day, with hundreds of megabytes of memory per account, just to see who wrote.
+
+Last Seen keeps WhatsApp **on your server** and gives your laptop only what it shows. Measured on a running desktop with two connected accounts:
+
+| | Per account |
+| --- | --- |
+| Memory (PSS) | **30–35 MB** |
+| CPU while idle | **0.1–0.4 %** |
+| Extra apps or windows | **none**: the panel is QML loaded into the Omarchy shell you already run |
+| Network while idle | one quiet RabbitMQ connection that pushes new messages (or a small poll every 30 s without it) |
+
+How:
 
 - **[Evolution API](https://github.com/EvolutionAPI/evolution-api)**, on your own server, holds the WhatsApp session (as a linked device, like WhatsApp Web).
-- Your desktop runs **one small Python process per account (about 45 MB, under 2% CPU)** and a native QML panel inside the Omarchy shell you already have.
-- New messages arrive **instantly over RabbitMQ**. Without it, Last Seen polls quietly.
+- Each account gets **one small Python process** (standard library only, plus `pika` for push) that fetches what the panel needs and caches pictures and media.
+- The panel is native Qt Quick inside the shell: no web engine, no second toolkit.
 
 > **Last Seen depends on Evolution API.** You need an Evolution API server (2.3.x) with your phone linked to it.
 > The [`server/`](server/) folder installs one with a single command.
 
 ## Features
 
+**Accounts**
+- As many WhatsApp accounts as you want, switch with one click (see above)
+- Total unread in the bar, per-account counts in the switcher, notifications labeled by account
+
 **Chats**
 - Chat list with pictures, unread counts, delivery ticks and "typing…"
 - Search by name or number, filters (All / Unread / Groups); type a number to start a new chat
-- Several WhatsApp accounts, switch with one click; unread counts and notifications per account
 - Desktop notifications grouped per chat ("Alex (3)"); "Open" jumps to the chat; @mentions always notify
 
 **Messages**
@@ -65,7 +97,7 @@ Last Seen runs WhatsApp **on your server**, not on your laptop:
 - Keyboard first: arrows, Enter, Esc, type to search
 - English and French (more welcome)
 - Follows your Omarchy theme
-- Demo mode with fake chats: try it with no server at all
+- Demo mode with fake chats (`demo`, and `demo-work` for a second account): try it with no server at all
 
 ## How it works
 
@@ -137,12 +169,12 @@ omarchy plugin add https://github.com/meliani/omarchy-lastseen --enable
 ~/.config/omarchy/plugins/meliani.lastseen/scripts/setup.sh
 ```
 
-It asks for the server URL, your account name and its token, checks them, stores the secrets **in your keyring** (never in a file), installs what's missing (`libnotify`, `wl-clipboard`, `mpv`, `ffmpeg`, `python-pika`) and turns the account on. Click the icon in your bar.
+It asks for the server URL, then each account's name and token (add as many as you like), checks them, stores the secrets **in your keyring** (never in a file), installs what's missing (`libnotify`, `wl-clipboard`, `mpv`, `ffmpeg`, `python-pika`) and turns the account on. Click the icon in your bar.
 
-**Just looking?** No server needed:
+**Just looking?** No server needed, two fictional accounts:
 
 ```bash
-omarchy bar set meliani.lastseen accounts demo
+omarchy bar set meliani.lastseen accounts "demo, demo-work"
 ```
 
 ## Settings

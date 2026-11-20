@@ -48,7 +48,7 @@ url=${url%/}
 
 accounts=()
 while :; do
-  name=$(ask "Account name (Evolution instance), empty to finish" "")
+  name=$(ask "Account to add (Evolution instance name), empty to finish" "")
   [[ -z "$name" ]] && break
   token=$(ask "API token of \"$name\" (the instance token)" "" --password)
   [[ -n "$token" ]] || die "a token is required"
@@ -61,6 +61,17 @@ while :; do
   accounts+=("$name")
   say "\"$name\" is connected (WhatsApp state: $state)"
 done
+# Keep the accounts already set up on this machine (their token is in the keyring).
+IFS=, read -ra existing <<<"$(omarchy bar get "$PLUGIN" accounts 2>/dev/null || true)"
+kept=()
+for old in "${existing[@]}"; do
+  old=$(printf '%s' "$old" | sed -E 's/^ +| +$//g')
+  [[ -z "$old" || " ${accounts[*]} " == *" $old "* ]] && continue
+  if [[ "$old" == demo* ]] || secret-tool lookup service "$SERVICE" key "$(slug "$old")-token" >/dev/null 2>&1; then
+    kept+=("$old")
+  fi
+done
+accounts=("${kept[@]}" "${accounts[@]}")
 (( ${#accounts[@]} )) || die "add at least one account"
 store url "$url"
 

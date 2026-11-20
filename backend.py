@@ -1868,9 +1868,9 @@ def main(argv):
         sys.exit(2)
     EXCHANGE = options.get("--exchange") or EXCHANGE
     COUNTRY = re.sub(r"\D", "", options.get("--country") or "")
-    if args[0].strip().lower() == "demo":
+    if args[0].strip().lower() in ("demo", "demo-work"):
         from demo import Demo
-        Demo().run()
+        Demo(args[0].strip().lower()).run()
         return
     try:
         backend = Backend(args[0])

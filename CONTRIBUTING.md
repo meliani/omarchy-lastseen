@@ -10,7 +10,7 @@ The demo account needs no Evolution API and no phone, and shows every kind of me
 # work on a clone that Omarchy loads directly
 git clone https://github.com/<you>/omarchy-lastseen ~/.config/omarchy/plugins/meliani.lastseen
 omarchy bar put meliani.lastseen --section right
-omarchy bar set meliani.lastseen accounts demo
+omarchy bar set meliani.lastseen accounts "demo, demo-work"   # two fictional accounts
 ```
 
 After editing QML, run `omarchy restart shell` (or save twice: the shell reloads plugins on save).

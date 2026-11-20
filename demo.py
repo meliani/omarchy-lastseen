@@ -2,6 +2,8 @@
 
 Set the account name to `demo` (`omarchy bar set meliani.lastseen accounts demo`)
 to try the plugin, take screenshots, or work on the UI without Evolution API.
+`demo-work` is a second, business account: `accounts "demo, demo-work"` shows
+the account switcher.
 """
 import base64
 import colorsys
@@ -19,8 +21,11 @@ _lock = threading.Lock()
 
 def emit(kind, **fields):
     with _lock:
-        sys.stdout.write(json.dumps({"type": kind, **fields}) + "\n")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(json.dumps({"type": kind, **fields}) + "\n")
+            sys.stdout.flush()
+        except BrokenPipeError:      # the shell went away
+            os._exit(0)
 
 
 def png(width, height, pixel):
@@ -63,8 +68,9 @@ def avatar(name, hue_a, hue_b):
 
 
 class Demo:
-    def __init__(self):
+    def __init__(self, variant="demo"):
         now = int(time.time())
+        self.work = variant.startswith("demo-work")
         self.now = now
         self.open_jid = ""
         photo = base64.b64encode(sunset()).decode()
@@ -87,6 +93,18 @@ class Demo:
             {"jid": "unknown@demo", "name": "", "phone": "+1 555 010 0123", "group": False, "unread": 1,
              "ts": now - 90000, "preview": {"kind": "text", "text": "Is the apartment still available?"}, "fromMe": False, "sender": "", "status": ""},
         ]
+        if self.work:
+            self.avatars = {"lina@demo": avatar("lina", 0.02, 0.10), "ops@demo": avatar("ops", 0.48, 0.58)}
+            self.chats = [
+                {"jid": "lina@demo", "name": "Lina Ortiz", "phone": "+1 555 010 0161", "group": False, "unread": 3,
+                 "ts": now - 240, "preview": {"kind": "document", "text": "Quote_Q4.pdf"}, "fromMe": False, "sender": "", "status": ""},
+                {"jid": "ops@demo", "name": "Ops — Night Shift", "phone": "", "group": True, "unread": 4,
+                 "ts": now - 1300, "preview": {"kind": "text", "text": "Server back up ✅"}, "fromMe": False, "sender": "Kai", "status": ""},
+                {"jid": "order@demo", "name": "", "phone": "+1 555 010 0188", "group": False, "unread": 0,
+                 "ts": now - 5400, "preview": {"kind": "text", "text": "Your order #4821 has shipped"}, "fromMe": True, "sender": "", "status": "delivered"},
+                {"jid": "front@demo", "name": "Front Desk", "phone": "", "group": True, "unread": 0,
+                 "ts": now - 90000, "preview": {"kind": "audio", "text": ""}, "fromMe": False, "sender": "Mia", "status": ""},
+            ]
         for chat in self.chats:
             chat["avatar"] = self.avatars.get(chat["jid"], "")
         m = lambda i, **kw: dict({"id": f"demo{i}", "fromMe": False, "sender": "", "senderJid": "", "status": "",
@@ -119,7 +137,10 @@ class Demo:
 
     def run(self):
         emit("status", connection="open", listener=True)
-        emit("account", name="Sam Rivera", phone="+1 555 010 0100", jid="me@demo", avatar=avatar("sam", 0.62, 0.70))
+        if self.work:
+            emit("account", name="Rivera Studio", phone="+1 555 010 0200", jid="work@demo", avatar=avatar("studio", 0.12, 0.02))
+        else:
+            emit("account", name="Sam Rivera", phone="+1 555 010 0100", jid="me@demo", avatar=avatar("sam", 0.62, 0.70))
         self.send_chats()
         for line in sys.stdin:
             try:
