@@ -593,7 +593,7 @@ class Backend:
         self.mark_read = False
         self.last_chats = 0.0
         self.last_messages = 0.0
-        self.aliases = {}            # shown chat jid -> every Evolution jid of that person
+        self.aliases = {}            # any Evolution jid of a person -> all of them
         self.keys = {}               # message id -> key, for quoting, reacting, editing
         self.last_keys = {}          # chat jid -> key of its newest message (mark unread)
         self.typing_at = {}          # chat jid -> when "typing…" was last sent
@@ -812,7 +812,11 @@ class Backend:
         if not self.live:
             self.spot_new(rows if isinstance(rows, list) else [])
         self.chat_ids = [c["jid"] for c in chats]
+        before = self.aliases.get(open_jid)
         chats = self.merge_aliases(chats)
+        if open_jid and self.aliases.get(open_jid, [open_jid]) != (before or [open_jid]):
+            with self.lock:
+                self.dirty_messages = True      # e.g. our first message to a new alias: fetch it too
         emit("chats", chats=chats)
         for c in chats:
             if not c["avatar"]:
@@ -881,7 +885,9 @@ class Backend:
             head["unread"] = sum(c["unread"] for c in group)
             head["name"] = next((c["name"] for c in group if c["name"]), "")
             head["avatar"] = next((c["avatar"] for c in group if c["avatar"]), "")
-            aliases[head["jid"]] = [c["jid"] for c in group]
+            members = [c["jid"] for c in group]
+            for jid in members:     # a sent message can make another alias the head: keep the open one working
+                aliases[jid] = members
             merged.append(head)
         merged.sort(key=lambda c: c["ts"], reverse=True)
         self.aliases = aliases
@@ -1821,6 +1827,12 @@ def self_test():
     assert d.read == {"10000000000001@lid": "AB1"} and d.dirty
     d.mark_read("10000000000001@lid", "")
     assert d.read == {}
+    b = Backend.__new__(Backend)
+    b.directory, b.aliases = d, {}
+    d.lid2pn["10000000000009@lid"] = "212600000009@s.whatsapp.net"
+    chat = lambda jid, ts: {"jid": jid, "group": False, "ts": ts, "unread": 0, "name": "", "avatar": ""}
+    b.merge_aliases([chat("10000000000009@lid", 1), chat("212600000009@s.whatsapp.net", 2)])
+    assert b.is_open("212600000009@s.whatsapp.net", "10000000000009@lid")   # opened by lid, head is now the phone
     d.me = "Sam"
     d.names["212600000001@s.whatsapp.net"] = "Alex"
     d.map_lid("10000000000001@lid", "212600000001@s.whatsapp.net")
