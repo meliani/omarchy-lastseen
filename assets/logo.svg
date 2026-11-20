@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Last Seen</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3fe3ad"/>
+      <stop offset="1" stop-color="#0f9e78"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9fff7"/>
+    </linearGradient>
+  </defs>
+  <!-- app tile -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <!-- chat bubble with its tail -->
+  <path transform="translate(512 0) scale(-1 1)" d="M256 104c-92.8 0-168 63.9-168 142.7 0 42.5 21.9 80.6 56.6 106.7l-14.9 55.3c-1.8 6.8 5.5 12.3 11.6 8.8l65.9-37.9c15.4 4.3 31.8 6.6 48.8 6.6 92.8 0 168-63.9 168-142.7S348.8 104 256 104z" fill="url(#face)"/>
+  <!-- clock face: "last seen at…" -->
+  <circle cx="256" cy="244" r="86" fill="none" stroke="#0f9e78" stroke-width="18"/>
+  <path d="M256 194v54l38 26" fill="none" stroke="#0f9e78" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="248" r="10" fill="#0f9e78"/>
+</svg>

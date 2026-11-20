@@ -1,0 +1,4 @@
+server/.env
+server/qr.png
+__pycache__/
+*.pyc

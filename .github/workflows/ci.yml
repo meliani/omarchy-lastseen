@@ -1,0 +1,27 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Backend logic
+        run: python3 backend.py --self-test
+      - name: Display logic
+        run: node tests/model.test.js
+      - name: JSON files
+        run: python3 -c "import json,glob; [json.load(open(f)) for f in ['manifest.json', *glob.glob('i18n/*.json')]]"
+      - name: Shell scripts
+        run: bash -n server/install.sh && bash -n scripts/setup.sh
+      - name: Compose file
+        run: cd server && cp .env.example .env && docker compose config -q

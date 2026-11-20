@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Evolution API (server side)
+    url: https://github.com/EvolutionAPI/evolution-api/issues
+    about: Problems linking WhatsApp or with the API itself belong there.

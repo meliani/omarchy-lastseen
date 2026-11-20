@@ -1,0 +1,14 @@
+name: Feature idea
+description: Something Last Seen could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to do, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How could it look or work? (optional)

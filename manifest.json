@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "meliani.lastseen",
+  "name": "Last Seen",
+  "version": "1.0.0",
+  "author": "Mohamed El Meliani",
+  "license": "MIT",
+  "description": "Your WhatsApp chats in the Omarchy bar, through your own Evolution API server: read, reply, react, voice notes, media and notifications. Fast and light.",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Panel.qml" },
+  "barWidget": {
+    "displayName": "Last Seen",
+    "description": "Read and answer your WhatsApp chats from the bar (needs Evolution API).",
+    "category": "Communication",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "accounts": "",
+      "countryCode": "",
+      "amqpExchange": "",
+      "notifications": true,
+      "notifyGroups": false,
+      "autoDownload": true,
+      "appearOnline": false
+    },
+    "schema": [
+      { "key": "accounts", "type": "string", "label": "Accounts: Evolution instance names, comma-separated (\"demo\" shows fake chats)", "defaultValue": "" },
+      { "key": "countryCode", "type": "string", "label": "Your country calling code, so local numbers like 06… work in search (e.g. 33, 212)", "defaultValue": "" },
+      { "key": "amqpExchange", "type": "string", "label": "RabbitMQ exchange of Evolution (RABBITMQ_EXCHANGE_NAME), if not \"evolution\"", "defaultValue": "" },
+      { "key": "notifications", "type": "boolean", "label": "Notify new messages", "defaultValue": true },
+      { "key": "notifyGroups", "type": "boolean", "label": "Also notify group messages (mentions always notify)", "defaultValue": false },
+      { "key": "autoDownload", "type": "boolean", "label": "Save photos, voice notes and files as they arrive (kept after the sender deletes them)", "defaultValue": true },
+      { "key": "appearOnline", "type": "boolean", "label": "Appear online while a chat is open (shows others' online / typing… in return)", "defaultValue": false }
+    ]
+  }
+}

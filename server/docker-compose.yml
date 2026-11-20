@@ -1,0 +1,119 @@
+# Evolution API for Last Seen: WhatsApp gateway + its database, cache and
+# event broker. `./install.sh` fills .env, starts this and links your phone.
+#
+#   docker compose up -d                    # plain HTTP on EVOLUTION_PORT
+#   docker compose --profile https up -d    # + Caddy with automatic HTTPS for EVOLUTION_DOMAIN
+
+name: lastseen
+
+services:
+  evolution:
+    # Pinned on purpose: Evolution 2.4 requires activating every server
+    # against a licence service before its API answers.
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    ports:
+      - "${EVOLUTION_BIND:-127.0.0.1}:${EVOLUTION_PORT:-8080}:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: ${SERVER_URL}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      DEL_INSTANCE: "false"
+      LANGUAGE: en
+      # How the link shows up in WhatsApp > Linked devices.
+      CONFIG_SESSION_PHONE_CLIENT: Last Seen
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: 30
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_LABELS: "true"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+      # Instant push to the desktop. Last Seen polls when it can't reach RabbitMQ.
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_URI: amqp://evolution:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      RABBITMQ_EXCHANGE_NAME: evolution
+      RABBITMQ_GLOBAL_ENABLED: "true"
+      RABBITMQ_EVENTS_MESSAGES_UPSERT: "true"
+      RABBITMQ_EVENTS_MESSAGES_UPDATE: "true"
+      RABBITMQ_EVENTS_CONNECTION_UPDATE: "true"
+      RABBITMQ_EVENTS_PRESENCE_UPDATE: "true"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: evolution
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      # The desktop connects here for instant updates. Keep it on localhost or
+      # a private network (Tailscale, WireGuard, LAN): AMQP is not encrypted.
+      - "${AMQP_BIND:-127.0.0.1}:${AMQP_PORT:-5672}:5672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 20
+
+  caddy:
+    profiles: ["https"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [evolution]
+    ports:
+      - "80:80"
+      - "443:443"
+    command: ["caddy", "reverse-proxy", "--from", "${EVOLUTION_DOMAIN}", "--to", "evolution:8080"]
+    volumes:
+      - caddy_data:/data
+
+volumes:
+  evolution_instances:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  caddy_data:
